@@ -20,7 +20,6 @@ instance Arbitrary Expr where
 
 prop :: Expr -> Bool
 prop (Expr x) = toRPN x == toRPN' x
-
 prop' (Expr x) = toRPN'' x == toRPN' x
 
 
