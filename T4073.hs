@@ -1,7 +1,10 @@
 {-# OPTIONS_GHC -O3 #-}
 {-# LANGUAGE BangPatterns #-}
 
+
 import Control.Monad
+import Control.Monad.Identity
+import Control.Applicative
 import Data.Array
 
 -- Simple Version
@@ -34,10 +37,16 @@ parseCase = toInts . words
             where toInts [x,y] = (read x, read y)
 
 outputSolution :: String -> String
-outputSolution s = s ++ " " ++ show (uncurry solve $ parseCase s)
+outputSolution s = s ++ " " ++ f s
+    where f = show . uncurry solve . parseCase
+
 
 main :: IO ()
-main = do
-  cases <- lines `liftM` getContents
-  mapM_ (putStrLn . outputSolution) cases
-  return ()
+main =  do
+    cases <- lines <$> getContents
+    mapM_ (putStrLn . outputSolution) cases
+
+
+
+toInts' [x, y] = (read x, read y)
+
