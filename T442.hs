@@ -1,11 +1,11 @@
 {-# OPTIONS_GHC -O3 #-}
 {-# LANGUAGE BangPatterns #-}
 import Control.Applicative
-import qualified Data.Map as M
-import Data.Maybe (maybeToList)
-import Data.List (span)
+-- import qualified Data.Map as M
+-- import Data.Maybe (maybeToList)
+-- import Data.List (span)
 -- import Control.Monad.Reader
-import Control.Monad (join)
+-- import Control.Monad (join)
 import Control.Arrow (second)
 -- import qualified Data.Set as S
 import qualified Data.Array as A
@@ -16,6 +16,22 @@ type Node = Int
 -- type Graph = M.Map Node [Node]
 type Graph = A.Array Node [Node]
 
+data CL a = Head [a] | (CL a) :-: (CL a)
+                deriving Show
+
+popCL :: CL t -> (t, CL t)
+popCL (Head []) = error "Getting head"
+popCL (Head (x:xs)) = (x, Head xs)
+popCL (Head [] :-: conc) = popCL conc
+popCL (c1 :-: c2) =
+    let (h, c1') = popCL c1
+    in (h, c1' :-: c2)
+
+cons :: CL t -> CL t -> CL t
+cons (Head []) c = c
+cons c (Head []) = c
+cons c1 c2 = c1 :-: c2
+
 -- metaSearch2 :: ([Node] -> [Node] -> [Node]) -> Graph -> Node -> [Node]
 -- metaSearch2 s g start  =  ms S.empty [start]
 --     where ms !marked [] = []
@@ -25,27 +41,38 @@ type Graph = A.Array Node [Node]
 --                   let children = join . maybeToList $ M.lookup n g
 --                   in n: ms (n `S.insert` marked) (ns `s` children)
 
-metaSearch :: ([Node] -> [Node] -> [Node]) -> Graph -> Node -> [Node]
-metaSearch s g start  = runST $ ms [start]
+metaSearch :: (CL Node -> CL Node -> CL Node) -> Graph -> Node -> [Node]
+metaSearch s g start  = runST $ ms (Head [start])
     where ms vs = do
             let size = snd $ A.bounds g
             marked <- newListArray (0, size-1) $ repeat False :: ST s (STUArray s Int Bool)
-            let loop [] = return []
-                loop (n:ns) = do
+            let loop (Head []) = return []
+                loop cl = do
+                    let (n, ns) = popCL cl
                     isMarked <- readArray marked (n-1)
                     if isMarked then loop ns
                         else do
                             writeArray marked (n-1) True
 --                            let children = join . maybeToList $ M.lookup n g
                             let children = g A.! n
-                            (n:) <$> loop (ns `s` children)
+                            (n:) <$> loop (ns `s` (Head children))
+--             let loop [] = return []
+--                 loop (n:ns) = do
+--                     isMarked <- readArray marked (n-1)
+--                     if isMarked then loop ns
+--                         else do
+--                             writeArray marked (n-1) True
+-- --                            let children = join . maybeToList $ M.lookup n g
+--                             let children = g A.! n
+--                             (n:) <$> loop (ns `s` children)
             loop vs
 
+-- bfs :: Graph -> Node -> [Node]
 bfs :: Graph -> Node -> [Node]
-bfs = metaSearch (++)
+bfs = metaSearch cons
 
 dfs :: Graph -> Node -> [Node]
-dfs = metaSearch $ flip (++)
+dfs = metaSearch $ flip cons
 
 data Search = BFS | DFS
             deriving Show
@@ -99,6 +126,9 @@ getLinks (n:ns) =
 
 output :: (Int, [[Int]]) -> String
 output (i, c) = unlines $ ("graph " ++ show i) : map (unwords . map show) c
+
+graph = ["6", "1 2 3 4", "2 2 3 6", "3 2 1 2", "4 1 1", "5 0", "6 1 2", "5 1", "1 0", "1 0", "0 0"]
+
 
 main :: IO ()
 main = do
